@@ -1,0 +1,4 @@
+*env/
+django_csv/src/csv_uploads/
+*__pycache__/
+excel_saver/.pytest_cache/

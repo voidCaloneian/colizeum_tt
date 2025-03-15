@@ -1,0 +1,75 @@
+x-default-working-dir: &default-working-dir
+  working_dir: /app/src
+
+services:
+  web:
+    build: .
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - redis
+    <<: *default-working-dir
+    command: gunicorn core.wsgi:application --bind 0.0.0.0:8000
+
+  smtpd:
+    image: python:3.11-slim
+    command: python -m smtpd -n -c DebuggingServer 0.0.0.0:1025
+    ports:
+      - "1025:1025"
+
+  celery:
+    build: .
+    env_file:
+      - .env
+    command: celery -A core worker -l info
+    volumes:
+      - .:/app
+    depends_on:
+      - web
+      - redis
+    <<: *default-working-dir
+
+  flower:
+    build: .
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+    command: celery -A core flower --port=5555
+    ports:
+      - "5555:5555"
+    depends_on:
+      - redis
+    <<: *default-working-dir
+
+  db:
+    image: postgres:13
+    env_file:
+      - .env
+    ports:
+      - "5431:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:6
+    ports:
+      - "6378:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
